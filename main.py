@@ -28,7 +28,7 @@ def get_db():
     try: yield db
     finally: db.close()
 
-# --- CONFIGURATION AUTOMATIQUE EXCEL & EMAIL ---
+# --- ENGINE EXTRACTION EXCEL AUTOMATIQUE ---
 EMAIL_EMETTEUR = "votre_email_bureau@gmail.com"
 EMAIL_MOT_DE_PASSE = "votre_mot_de_passe_secret"
 EMAIL_DESTINATAIRE = "directeur_projet@entreprise.com"
@@ -56,8 +56,8 @@ def envoyer_rapport_samedi():
     msg = MIMEMultipart()
     msg['From'] = EMAIL_EMETTEUR
     msg['To'] = EMAIL_DESTINATAIRE
-    msg['Subject'] = f"⚡ LINE_CHECK - Rapport Hebdomadaire HTB ({datetime.now().strftime('%d/%m/%Y')})"
-    msg.attach(MIMEText("Bonjour,\n\nVeuillez trouver ci-joint le rapport automatique d'avancement.", 'plain'))
+    msg['Subject'] = f"LINE_CHECK - Rapport Hebdomadaire HTB ({datetime.now().strftime('%d/%m/%Y')})"
+    msg.attach(MIMEText("Bonjour,\n\nVeuillez trouver ci-joint le rapport hebdomadaire d'avancement.", 'plain'))
     try:
         with open(nom_fichier, "rb") as attachment:
             part = MIMEBase('application', 'octet-stream')
@@ -73,25 +73,19 @@ def envoyer_rapport_samedi():
     except Exception as e:
         print(f"Erreur e-mail : {e}")
 
-# --- SYSTEME DE REVEIL AUTOMATIQUE TOUTES LES MINUTES (ANTI-SOMMEIL RENDER) ---
-# --- SYSTEME DE REVEIL AUTOMATIQUE SECURISE (ANTI-SOMMEIL) ---
+# --- ROBOT AUTOMATIQUE ANTI-SOMMEIL CLOUD ---
 def garder_serveur_actif():
-    # Render met 2 à 3 minutes à démarrer, on évite de lancer le ping immédiatement
     try:
         url_render = "https://onrender.com"
-        # On ajoute un en-tête User-Agent pour que la requête ne soit pas bloquée
         req = urllib.request.Request(url_render, headers={'User-Agent': 'Mozilla/5.0'})
         with urllib.request.urlopen(req, timeout=15) as response:
-            print(f"⏰ Ping d'activite envoye. Statut : {response.getcode()}")
+            print(f"Ping d'activite envoye : {response.getcode()}")
     except Exception as e:
-        # Si le serveur n'est pas encore prêt sur internet, on ignore l'erreur au lieu de crasher
-        print(f"⚠️ Robot de garde en attente du réseau Cloud : {e}")
+        print(f"Robot de garde en attente : {e}")
 
 scheduler = BackgroundScheduler()
 scheduler.add_job(envoyer_rapport_samedi, 'cron', day_of_week='sat', hour=13, minute=0)
-
-# On utilise une planification par intervalle de 2 minutes pour rester sous les 15 minutes de Render
-scheduler.add_job(garder_serveur_actif, 'interval', minutes=2, id='ping_job')
+scheduler.add_job(garder_serveur_actif, 'interval', minutes=3)
 scheduler.start()
 
 from interface import obtenir_status_style, get_pct, generer_bureau_html, generer_login_html, generer_mobile_html
@@ -248,7 +242,6 @@ def telecharger_rapport_excel(db: Session = Depends(get_db)):
         df.to_excel(writer, index=False, sheet_name="Avancement Chantier")
     return FileResponse(path=nom_fichier, filename=nom_fichier, media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
-# --- CONFIGURATION DE REVEIL AUTOMATIQUE CLOUD (STARTUP EVENT) ---
 @app.on_event("startup")
 def initialisation_automatique_cloud():
     db = SessionLocal()
@@ -263,4 +256,4 @@ def initialisation_automatique_cloud():
         db.add(Controle(id=2, line_name="Portion HTB - Pylone 02", status="En attente"))
         db.commit()
     db.close()
-    print("Vérification, initialisation et démarrage du système accomplis !")
+    print("Verification, initialisation et démarrage du système accomplis !")
