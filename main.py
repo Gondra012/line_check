@@ -8,6 +8,7 @@ import os
 import pandas as pd
 from datetime import datetime
 import smtplib
+import urllib.request
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email.mime.text import MIMEText
@@ -27,7 +28,7 @@ def get_db():
     try: yield db
     finally: db.close()
 
-# --- CONFIGURATION AUTOMATIQUE EXCEL ---
+# --- CONFIGURATION AUTOMATIQUE EXCEL & EMAIL ---
 EMAIL_EMETTEUR = "votre_email_bureau@gmail.com"
 EMAIL_MOT_DE_PASSE = "votre_mot_de_passe_secret"
 EMAIL_DESTINATAIRE = "directeur_projet@entreprise.com"
@@ -72,9 +73,21 @@ def envoyer_rapport_samedi():
     except Exception as e:
         print(f"Erreur e-mail : {e}")
 
+# --- SYSTEME DE REVEIL AUTOMATIQUE TOUTES LES MINUTES (ANTI-SOMMEIL RENDER) ---
+def garder_serveur_actif():
+    try:
+        # NOTE : METTEZ ICI VOTRE VRAI LIEN INTERNET DEFINITIF FOURNI PAR RENDER
+        url_render = "https://onrender.com"
+        urllib.request.urlopen(url_render, timeout=10)
+        print("⏰ Ping d'activite envoye pour garder Render actif !")
+    except Exception as e:
+        print(f"⚠️ Echec du ping de reveil : {e}")
+
 scheduler = BackgroundScheduler()
 scheduler.add_job(envoyer_rapport_samedi, 'cron', day_of_week='sat', hour=13, minute=0)
+scheduler.add_job(garder_serveur_actif, 'interval', minutes=1)
 scheduler.start()
+
 from interface import obtenir_status_style, get_pct, generer_bureau_html, generer_login_html, generer_mobile_html
 
 @app.get('/', response_class=HTMLResponse)
@@ -101,12 +114,13 @@ def home(db: Session = Depends(get_db)):
         img = f"<a href='/fichiers/{c.photo_path}' target='_blank' style='color:#2563eb; font-weight:600; text-decoration:none;'>👁️ Voir Photo</a>" if c.photo_path else "<span style='color:#94a3b8;'>Pas de photo</span>"
         btn_suppr = f"<a href='/supprimer-pylone/{c.id}' style='color:#ef4444; font-weight:bold; text-decoration:none; margin-left:10px;' onclick='return confirm(\"Supprimer ce pylône ?\");'>❌</a>"
         
-        rows += f"<tr><td style='padding:14px; border-bottom:1px solid #e2e8f0;'>#{c.id} {btn_suppr}</td><td style='padding:14px; border-bottom:1px solid #e2e8f0; font-weight:600;'>{c.line_name}</td><td style='padding:14px; border-bottom:1px solid #e2e8f0;'><span style='padding:6px 12px; border-radius:20px; font-size:11px; font-weight:bold; text-transform:uppercase; {badge_style}'>{c.status}</span></td><td style='padding:14px; border-bottom:1px solid #e2e8f0;'><div style='background:#e2e8f0; border-radius:8px; width:100px; height:10px; display:inline-block; margin-right:8px; overflow:hidden;'><div style='background:#16a34a; height:100%; width:{pct}%;'></div></div> <b>{pct}%</b></td><td style='padding:14px; border-bottom:1px solid #e2e8f0;'>{t_name}</td><td style='padding:14px; border-bottom:1px solid #e2e8f0;'>{d_deb}</td><td style='padding:14px; border-bottom:1px solid #e2e8f0;'>{d_fin}</td><td style='padding:14px; border-bottom:1px solid #e2e8f0;'><span style='{mq_style}'>{mq_text}</span></td><td style='padding:14px; border-bottom:1px solid #e2e8f0;'>{img}</td></tr>"
+        rows += f"<tr><td style='padding:14px; border-bottom:1px solid #e2e8f0;'>#{c.id} {btn_suppr}</td><td style='padding:14px; border-bottom:1px solid #e2e8f0; font-weight:600;'>{c.line_name}</td><td style='padding:14px; border-bottom:1px solid #e2e8f0;'><span style='padding:6px 12px; border-radius:20px; font-size:11px; font-weight:bold; text-transform:uppercase; {badge_style}'>{c.status}</span></td><td style='padding:14px; border-bottom:1px solid #e2e8f0;'><div style='background:#e2e8f0; border-radius:8px; width:100px; height:10px; display:inline-block; margin-right:8px; overflow:hidden;'><div style='background:#16a34a; height:100%; width:{pct}%;'></div></div> <b>{pct}%</b></td><td>{t_name}</td><td>{d_deb}</td><td>{d_fin}</td><td><span style='{mq_style}'>{mq_text}</span></td><td>{img}</td></tr>"
         
     u_list = ''.join([f"<li style='padding:6px 0; border-bottom:1px solid #f1f5f9; color:#334155;'><a href='/supprimer-user/{usr.id}' style='color:#ef4444; font-weight:bold; text-decoration:none; margin-right:8px;' onclick='return confirm(\"Supprimer définitivement cet équipier ?\");'>❌</a><b>{usr.name}</b> - {usr.role} [<span style='color:blue;'>{usr.equipe}</span>] - <b>{usr.statut_presence}</b></li>" for usr in users])
     opt_pylones = ''.join([f"<option value='{c.id}'>#{c.id} - {c.line_name}</option>" for c in controles])
     opt_techs = "".join([f"<option value='{u.id}'>{u.name} ({u.equipe})</option>" for u in users])
     return generer_bureau_html(tc, tu, t_presents, t_absents, alertes_manquants, rows, u_list, opt_pylones, opt_techs)
+
 sessions_actives = {}
 
 @app.get('/mobile', response_class=HTMLResponse)
@@ -227,3 +241,20 @@ def telecharger_rapport_excel(db: Session = Depends(get_db)):
     with pd.ExcelWriter(nom_fichier, engine='openpyxl') as writer:
         df.to_excel(writer, index=False, sheet_name="Avancement Chantier")
     return FileResponse(path=nom_fichier, filename=nom_fichier, media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+# --- CONFIGURATION DE REVEIL AUTOMATIQUE CLOUD (STARTUP EVENT) ---
+@app.on_event("startup")
+def initialisation_automatique_cloud():
+    db = SessionLocal()
+    Base.metadata.create_all(bind=engine)
+    if db.query(User).count() == 0:
+        db.add(User(id=2, name="Dominique", role="Technicien", password="123", equipe="Equipe A", statut_presence="Présent"))
+        db.add(User(id=3, name="BADINI", role="Technicien", password="123", equipe="Equipe B", statut_presence="Présent"))
+        db.add(User(id=4, name="MATHIEU", role="Technicien", password="123", equipe="Equipe A", statut_presence="Présent"))
+        db.commit()
+    if db.query(Controle).count() == 0:
+        db.add(Controle(id=1, line_name="Portion HTB - Pylone 01", status="En attente"))
+        db.add(Controle(id=2, line_name="Portion HTB - Pylone 02", status="En attente"))
+        db.commit()
+    db.close()
+    print("Vérification, initialisation et démarrage du système accomplis !")
