@@ -1,5 +1,4 @@
 from fastapi import FastAPI, Depends, Request, Form, File, UploadFile, HTTPException
-from contextlib import asynccontextmanager
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import create_engine
@@ -15,10 +14,12 @@ from email.mime.base import MIMEBase
 from email.mime.text import MIMEText
 from email import encoders
 from apscheduler.schedulers.background import BackgroundScheduler
+from contextlib import asynccontextmanager
 
 engine = create_engine('sqlite:///./line_check.db', connect_args={'check_same_thread': False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-# Ce bloc remplace la variable "startup" obsolète par le protocole Lifespan moderne
+
+# --- BLOC DE DEMARRAGE ET D'INITIALISATION SECURISE (LIFESPAN) ---
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     db = SessionLocal()
@@ -33,7 +34,7 @@ async def lifespan(app: FastAPI):
         db.add(Controle(id=2, line_name="Portion HTB - Pylone 02", status="En attente"))
         db.commit()
     db.close()
-    print("Initialisation automatique de la base Cloud accomplie !")
+    print("Verification et initialisation de la base Cloud accomplies !")
     yield
 
 app = FastAPI(lifespan=lifespan)
@@ -91,13 +92,6 @@ def envoyer_rapport_samedi():
         server.quit()
     except Exception as e:
         print(f"Erreur e-mail : {e}")
-
-if __name__ == "__main__":
-    import uvicorn
-    # Render injecte automatiquement le port dans la variable PORT, sinon on prend 10000
-    port = int(os.environ.get("PORT", 10000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
-
 
 # --- ROBOT AUTOMATIQUE ANTI-SOMMEIL CLOUD ---
 def garder_serveur_actif():
@@ -268,3 +262,7 @@ def telecharger_rapport_excel(db: Session = Depends(get_db)):
         df.to_excel(writer, index=False, sheet_name="Avancement Chantier")
     return FileResponse(path=nom_fichier, filename=nom_fichier, media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", 10000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
