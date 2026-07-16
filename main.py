@@ -92,6 +92,13 @@ def envoyer_rapport_samedi():
     except Exception as e:
         print(f"Erreur e-mail : {e}")
 
+if __name__ == "__main__":
+    import uvicorn
+    # Render injecte automatiquement le port dans la variable PORT, sinon on prend 10000
+    port = int(os.environ.get("PORT", 10000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
+
+
 # --- ROBOT AUTOMATIQUE ANTI-SOMMEIL CLOUD ---
 def garder_serveur_actif():
     try:
