@@ -74,18 +74,24 @@ def envoyer_rapport_samedi():
         print(f"Erreur e-mail : {e}")
 
 # --- SYSTEME DE REVEIL AUTOMATIQUE TOUTES LES MINUTES (ANTI-SOMMEIL RENDER) ---
+# --- SYSTEME DE REVEIL AUTOMATIQUE SECURISE (ANTI-SOMMEIL) ---
 def garder_serveur_actif():
+    # Render met 2 à 3 minutes à démarrer, on évite de lancer le ping immédiatement
     try:
-        # NOTE : METTEZ ICI VOTRE VRAI LIEN INTERNET DEFINITIF FOURNI PAR RENDER
         url_render = "https://onrender.com"
-        urllib.request.urlopen(url_render, timeout=10)
-        print("⏰ Ping d'activite envoye pour garder Render actif !")
+        # On ajoute un en-tête User-Agent pour que la requête ne soit pas bloquée
+        req = urllib.request.Request(url_render, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=15) as response:
+            print(f"⏰ Ping d'activite envoye. Statut : {response.getcode()}")
     except Exception as e:
-        print(f"⚠️ Echec du ping de reveil : {e}")
+        # Si le serveur n'est pas encore prêt sur internet, on ignore l'erreur au lieu de crasher
+        print(f"⚠️ Robot de garde en attente du réseau Cloud : {e}")
 
 scheduler = BackgroundScheduler()
 scheduler.add_job(envoyer_rapport_samedi, 'cron', day_of_week='sat', hour=13, minute=0)
-scheduler.add_job(garder_serveur_actif, 'interval', minutes=1)
+
+# On utilise une planification par intervalle de 2 minutes pour rester sous les 15 minutes de Render
+scheduler.add_job(garder_serveur_actif, 'interval', minutes=2, id='ping_job')
 scheduler.start()
 
 from interface import obtenir_status_style, get_pct, generer_bureau_html, generer_login_html, generer_mobile_html
