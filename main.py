@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Depends, Request, Form, File, UploadFile, HTTPException
-from contextlib import contextmanager
+from contextlib import asynccontextmanager
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import create_engine
