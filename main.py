@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Depends, Request, Form, File, UploadFile, HTTPException
+from contextlib import contextmanager
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import create_engine
@@ -17,7 +18,25 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 engine = create_engine('sqlite:///./line_check.db', connect_args={'check_same_thread': False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-app = FastAPI()
+# Ce bloc remplace la variable "startup" obsolète par le protocole Lifespan moderne
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    db = SessionLocal()
+    Base.metadata.create_all(bind=engine)
+    if db.query(User).count() == 0:
+        db.add(User(id=2, name="Dominique", role="Technicien", password="123", equipe="Equipe A", statut_presence="Présent"))
+        db.add(User(id=3, name="BADINI", role="Technicien", password="123", equipe="Equipe B", statut_presence="Présent"))
+        db.add(User(id=4, name="MATHIEU", role="Technicien", password="123", equipe="Equipe A", statut_presence="Présent"))
+        db.commit()
+    if db.query(Controle).count() == 0:
+        db.add(Controle(id=1, line_name="Portion HTB - Pylone 01", status="En attente"))
+        db.add(Controle(id=2, line_name="Portion HTB - Pylone 02", status="En attente"))
+        db.commit()
+    db.close()
+    print("Initialisation automatique de la base Cloud accomplie !")
+    yield
+
+app = FastAPI(lifespan=lifespan)
 
 if not os.path.exists('fichiers_chantier'): 
     os.makedirs('fichiers_chantier')
@@ -242,18 +261,3 @@ def telecharger_rapport_excel(db: Session = Depends(get_db)):
         df.to_excel(writer, index=False, sheet_name="Avancement Chantier")
     return FileResponse(path=nom_fichier, filename=nom_fichier, media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
-@app.on_event("startup")
-def initialisation_automatique_cloud():
-    db = SessionLocal()
-    Base.metadata.create_all(bind=engine)
-    if db.query(User).count() == 0:
-        db.add(User(id=2, name="Dominique", role="Technicien", password="123", equipe="Equipe A", statut_presence="Présent"))
-        db.add(User(id=3, name="BADINI", role="Technicien", password="123", equipe="Equipe B", statut_presence="Présent"))
-        db.add(User(id=4, name="MATHIEU", role="Technicien", password="123", equipe="Equipe A", statut_presence="Présent"))
-        db.commit()
-    if db.query(Controle).count() == 0:
-        db.add(Controle(id=1, line_name="Portion HTB - Pylone 01", status="En attente"))
-        db.add(Controle(id=2, line_name="Portion HTB - Pylone 02", status="En attente"))
-        db.commit()
-    db.close()
-    print("Verification, initialisation et démarrage du système accomplis !")
